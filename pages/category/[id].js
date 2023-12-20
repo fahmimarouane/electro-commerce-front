@@ -145,7 +145,6 @@ export async function getServerSideProps(context) {
     }
   };
 }
-
 */
 
 import Header from '@/components/Header';
@@ -155,7 +154,8 @@ import { Category } from '@/models/Category';
 import { Product } from '@/models/Product';
 import ProductsGrid from '@/components/ProductsGrid';
 import styled from 'styled-components';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import { motion, useAnimation } from 'framer-motion';
 import axios from 'axios';
 import Spinner from '@/components/Spinner';
 
@@ -168,10 +168,12 @@ const CategoryHeader = styled.div`
   }
 `;
 
-const FiltersWrapper = styled.div`
+const FiltersWrapper = styled(motion.div)`
   display: flex;
   gap: 15px;
-  overflow-x: auto; /* Make the container scrollable if there are many filters */
+  overflow-x: auto;
+  padding-bottom: 15px;
+  position: relative;
 `;
 
 const Filter = styled.div`
@@ -194,6 +196,8 @@ export default function CategoryPage({
   subCategories,
   products: originalProducts,
 }) {
+  const controls = useAnimation();
+  const filtersWrapperRef = useRef(null);
   const defaultSorting = '_id-desc';
   const defaultFilterValues = category.properties.map((p) => ({
     name: p.name,
@@ -204,8 +208,9 @@ export default function CategoryPage({
   const [sort, setSort] = useState(defaultSorting);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [filtersChanged, setFiltersChanged] = useState(false);
+  let scrollInterval;
 
-  function handleFilterChange(filterName, filterValue) {
+  const handleFilterChange = (filterName, filterValue) => {
     setFiltersValues((prev) =>
       prev.map((p) => ({
         name: p.name,
@@ -213,7 +218,17 @@ export default function CategoryPage({
       }))
     );
     setFiltersChanged(true);
-  }
+  };
+
+  useEffect(() => {
+    controls.start({ opacity: 1, x: 0 });
+    scrollInterval = setInterval(() => {
+      if (filtersWrapperRef.current) {
+        filtersWrapperRef.current.scrollLeft += 1;
+      }
+    }, 50);
+    return () => clearInterval(scrollInterval);
+  }, []);
 
   useEffect(() => {
     if (!filtersChanged) {
@@ -237,6 +252,12 @@ export default function CategoryPage({
     });
   }, [filtersValues, sort, filtersChanged]);
 
+  const handleFiltersWrapperClick = () => {
+    // Stop the automatic scrolling when the user clicks on the filters wrapper
+    controls.stop();
+    clearInterval(scrollInterval);
+  };
+
   return (
     <>
       <Header />
@@ -245,7 +266,14 @@ export default function CategoryPage({
           <h1>{category.name}</h1>
         </CategoryHeader>
 
-        <FiltersWrapper>
+        <FiltersWrapper
+          id="filtersWrapper"
+          ref={filtersWrapperRef}
+          initial={{ opacity: 0, x: -20 }}
+          animate={controls}
+          transition={{ duration: 0.5 }}
+          onClick={handleFiltersWrapperClick}
+        >
           {category.properties.map((prop) => (
             <Filter key={prop.name}>
               <span>{prop.name}:</span>
